@@ -159,9 +159,9 @@ NOTE: "_ocid1.compartment.oc1..aaaaaaaafml3tca3zcxyifmdff3aadp5uojimgx3cdnirgup6
 **Oracle NoSQL Database Cloud Service uses Oracle Cloud Infrastructure Identity and Access Management to provide secure access to Oracle Cloud.** Oracle Cloud 
 Infrastructure Identity and Access Management enables you to create user accounts and give users permission to inspect, read, use, or manage tables. 
 
-For demo purpose, I am providing all rights to the Dynamic Group created in my compartment.
+For demo purpose, I am granting the Dynamic Group access to Oracle NoSQL resources in my compartment.
 ```
-allow dynamic-group nosql-demos_davega to manage all-resources in compartment davega
+allow dynamic-group nosql-demos_davega to use nosql-family in compartment davega
 ```
 ![Working](Policies.png)
 
@@ -348,4 +348,3 @@ fn invoke $APP_NAME load-target < stream_baggage_data_file99.json
 In order to configure your LOCAL test system, you need to follow the instructions in the OCI Console - Getting Started (see screenshot below).
 
 ![Working](FunctionsSetup.png)
-

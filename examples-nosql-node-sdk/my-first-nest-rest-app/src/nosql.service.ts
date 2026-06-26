@@ -1,4 +1,9 @@
+import { BadRequestException } from '@nestjs/common';
 import { NoSQLClient, ServiceType, QueryResult, CapacityMode } from 'oracle-nosqldb';
+
+const MAX_LIMIT = 100;
+const SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const ORDER_COLUMNS = new Set(['id']);
 
 export class NoSQLService {
 
@@ -26,23 +31,59 @@ export class NoSQLService {
 
     static async findAll(tablename, params) {
       let rows = [];
-      let statement = `SELECT * FROM ${tablename}`;
+      if (!SQL_IDENTIFIER.test(tablename))
+         throw new BadRequestException('Invalid table name');
 
-      if (params.where )
-         statement = statement + " WHERE " + params.where;
-      if (params.orderby )
-         statement = statement + " ORDER BY " + params.orderby;
-      if (params.limit)
-         statement = statement + " LIMIT " + params.limit;
-      if (params.page && params.limit) {
-         let offset = +params.page*+params.limit;
-         statement = statement + " OFFSET " + offset;
-      }
+      let statement = `SELECT * FROM ${tablename}`;
+      const orderby = this.getOrderByClause(params.orderby);
+      if (orderby == null)
+         throw new BadRequestException('Invalid orderby');
+
+      const limit = this.parsePositiveInt(params.limit);
+      const page = this.parsePage(params.page);
+
+      if (orderby)
+         statement = statement + orderby;
+      if (limit)
+         statement = statement + " LIMIT " + limit;
+      if (page && limit)
+         statement = statement + " OFFSET " + page*limit;
 
       for await(const res of this.getInstance().getConnection().queryIterable(statement)) {
         rows.push.apply(rows, res.rows);
       }
       return rows;
+    }
+
+    private static parsePositiveInt(value, defaultValue = undefined) {
+      const parsed = Number.parseInt(value, 10);
+      if (!Number.isInteger(parsed) || parsed < 1)
+         return defaultValue;
+      return Math.min(parsed, MAX_LIMIT);
+    }
+
+    private static parsePage(value) {
+      const parsed = Number.parseInt(value, 10);
+      if (!Number.isInteger(parsed) || parsed < 0)
+         return 0;
+      return parsed;
+    }
+
+    private static getOrderByClause(orderby) {
+      if (!orderby)
+         return '';
+
+      const clauses = String(orderby).split(',').map((part) => {
+         const match = part.trim().match(/^([A-Za-z_][A-Za-z0-9_]*)(?:\s+(ASC|DESC))?$/i);
+         if (!match || !ORDER_COLUMNS.has(match[1]))
+            return null;
+         return match[1] + (match[2] ? ' ' + match[2].toUpperCase() : '');
+      });
+
+      if (clauses.some((clause) => clause == null))
+         return null;
+
+      return ' ORDER BY ' + clauses.join(', ');
     }
 
     static async findOne (tablename, id) {
@@ -122,4 +163,3 @@ export class NoSQLService {
     }
 
 }
-

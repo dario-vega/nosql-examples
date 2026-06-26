@@ -16,6 +16,7 @@
 
 import os
 import logging
+import re
 import uvicorn
 
 from borneo import (NoSQLHandle, NoSQLHandleConfig , 
@@ -67,10 +68,35 @@ def create_table ():
 # Create the NoSQL handle and NoSQL the JSON COLLECTION table 
 tableName="fapi_items"
 key="item_id"
+MAX_LIMIT=100
+ALLOWED_ORDER_COLUMNS={"item_id"}
 handle = get_connection()
 create_table()
 # Define the FastAPI app
 app = FastAPI()
+
+def normalize_pagination(page: int, limit: int):
+    if page < 0:
+       page = 0
+    if limit < 1:
+       limit = 10
+    return page, min(limit, MAX_LIMIT)
+
+def get_orderby_clause(orderby: str):
+    if not orderby:
+       return "item_id"
+
+    clauses = list()
+    for part in orderby.split(','):
+       match = re.fullmatch(r'\s*([A-Za-z_][A-Za-z0-9_]*)(?:\s+(ASC|DESC))?\s*', part, re.IGNORECASE)
+       if not match or match.group(1) not in ALLOWED_ORDER_COLUMNS:
+          raise HTTPException(status_code=400, detail="Invalid orderby")
+       clause = match.group(1)
+       if match.group(2):
+          clause = clause + " " + match.group(2).upper()
+       clauses.append(clause)
+
+    return ", ".join(clauses)
 
 
 # Endpoint to create an item
@@ -98,9 +124,11 @@ def create_item(item: Item):
     summary="Gets all item",
     response_description="A list containing all information about the Items"
 )
-def get_items(page: int = 0, limit: int = 10, orderby: str = "item_id", where: str = "" ):
+def get_items(page: int = 0, limit: int = 10, orderby: str = "item_id"):
     try:
-       statement = ("SELECT * FROM {table} {where} ORDER BY {orderby} LIMIT {limit} OFFSET {offset}").format(table=tableName,where=where,orderby=orderby,limit=limit,offset=limit*page)
+       page, limit = normalize_pagination(page, limit)
+       orderby = get_orderby_clause(orderby)
+       statement = ("SELECT * FROM {table} ORDER BY {orderby} LIMIT {limit} OFFSET {offset}").format(table=tableName,orderby=orderby,limit=limit,offset=limit*page)
        print(statement)
        request = QueryRequest().set_statement(statement)
        qiresult = handle.query_iterable(request)
@@ -113,6 +141,8 @@ def get_items(page: int = 0, limit: int = 10, orderby: str = "item_id", where: s
            print(f"Error: {e}")
            continue
        return items
+    except HTTPException:
+       raise
     except Exception as e:
        raise HTTPException(status_code=500, detail=f"Error: {e}")
 

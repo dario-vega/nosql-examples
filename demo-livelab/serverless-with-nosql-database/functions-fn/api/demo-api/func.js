@@ -21,7 +21,6 @@ fdk.handle(async function(input, ctx){
   let ticketNo;
   let confNo;
   let endPoint;
-  let sql;
 
   // Reading parameters from standard input for TEST purposes
   if (input && input.endPoint)
@@ -30,8 +29,6 @@ fdk.handle(async function(input, ctx){
     ticketNo = input.ticketNo;
   if (input && input.confNo)
     confNo = input.confNo;
-  if (input && input.sql)
-    sql = input.sql;
 
   // Reading parameters sent by the httpGateway
   let hctx = ctx.httpGateway
@@ -50,23 +47,19 @@ fdk.handle(async function(input, ctx){
 
   let rows;
   if (endPoint == "getBagInfoByTicketNumber") {
-     rows = getBagInfoByTicketNumber(ticketNo);
+     rows = await getBagInfoByTicketNumber(ticketNo);
   }
   else if (endPoint == "getPassengersAffectedByFlight") {
      const statementQry1 = `SELECT d.ticketNo as ticketNo, d.fullName as fullName, d.contactPhone as contactInfo, size(d.bagInfo) as numBags FROM demo d WHERE d.bagInfo.flightLegs.flightNo =ANY 'BM715'`
-     rows = {'message': endPoint + " under construction." , "sql" : statementQry1, "index" : "bagInfo.flightLegs.flightNo", "endPoint":"executeSQL"}
+     rows = {'message': endPoint + " under construction." , "sql" : statementQry1, "index" : "bagInfo.flightLegs.flightNo"}
   }
   else if ((endPoint == "getByConfirmationCode") && (confNo)) {
-	 const statementQryConfCode = `SELECT * FROM demo WHERE confNo =  "${confNo}"`;
-     rows = executeQuery(statementQryConfCode);
+     rows = await getByConfirmationCode(confNo);
   }
   else if ((endPoint == "getByConfirmationCode") && !(confNo)) {
      rows = {'message': endPoint + " missing parameter confNo"}
      hctx.statusCode=500;
   }  
-  else if ((endPoint == "executeSQL") && (sql)) {
-     rows = executeQuery(sql);
-  }
   else {
      rows = {'message': endPoint + " not managed"}
      hctx.statusCode=500;
@@ -84,16 +77,22 @@ fdk.handle(async function(input, ctx){
 
 async function getBagInfoByTicketNumber (ticketNo) {
   const statementQry1 = `SELECT * FROM demo LIMIT ${lim}`;
-  const statementQry2 = `SELECT * FROM demo WHERE ticketNo =  "${ticketNo}"`;
-  let result;
 
   if (ticketNo)
-     result = executeQuery(statementQry2);
+     return executePreparedQuery(
+       'DECLARE $ticketNo STRING; SELECT * FROM demo WHERE ticketNo = $ticketNo',
+       { $ticketNo: String(ticketNo) }
+     );
   else
-     result = executeQuery(statementQry1);
-  return result;
+     return executeQuery(statementQry1);
 }
 
+async function getByConfirmationCode (confNo) {
+  return executePreparedQuery(
+    'DECLARE $confNo STRING; SELECT * FROM demo WHERE confNo = $confNo',
+    { $confNo: String(confNo) }
+  );
+}
 
 
 async function executeQuery (statement) {
@@ -113,6 +112,21 @@ async function executeQuery (statement) {
   return rows;
 }
 
+async function executePreparedQuery (statement, bindings) {
+  const rows = [];
+  try {
+    const preparedStmt = await client.prepare(statement);
+    preparedStmt.bindings = bindings;
+    for await(const res of client.queryIterable(preparedStmt)) {
+       rows.push.apply(rows, res.rows);
+    }
+  }
+  catch(err) {
+        return err;
+  }
+  return rows;
+}
+
 function createClientResource() {
   return  new NoSQLClient({
     region: process.env.NOSQL_REGION,
@@ -124,4 +138,3 @@ function createClientResource() {
     }
   });
 }
-

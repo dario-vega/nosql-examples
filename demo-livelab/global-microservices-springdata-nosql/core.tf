@@ -196,7 +196,7 @@ resource oci_core_default_security_list export_Default-Security-List-for-vcn_nos
     #description = <<Optional value not found in discovery>>
     #icmp_options = <<Optional value not found in discovery>>
     protocol    = "6"
-    source      = "0.0.0.0/0"
+    source      = var.ssh_source_cidr
     source_type = "CIDR_BLOCK"
     stateless   = "false"
     tcp_options {
@@ -260,7 +260,7 @@ resource oci_core_default_security_list export_Default-Security-List-for-vcn_nos
     description = "Allow Spring demo traffic"
     #icmp_options = <<Optional value not found in discovery>>
     protocol    = "6"
-    source      = "0.0.0.0/0"
+    source      = var.demo_app_source_cidr
     source_type = "CIDR_BLOCK"
     stateless   = "false"
     tcp_options {
@@ -272,4 +272,3 @@ resource oci_core_default_security_list export_Default-Security-List-for-vcn_nos
   }
   manage_default_resource_id = oci_core_vcn.export_vcn_nosql_demos.default_security_list_id
 }
-

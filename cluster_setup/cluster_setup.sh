@@ -847,9 +847,9 @@ if [ "\$version" = "" ] ; then
 	echo "\$javahome on $host does not appear to point to valid java installation."
 	exit 1
 fi
-if [ \$version -lt 11 -o \$version -gt 19 ] ; then
+if [ "\$version" -lt 21 ]; then
 	echo ""
-	echo "Oracle NoSQL requires java version 11 or higher. The java installation on"
+	echo "Oracle NoSQL requires Java version 21 or higher. The java installation on"
 	echo "$host is \$version."
 	echo ""
 	exit 1
@@ -1752,6 +1752,9 @@ exit 1
 fi
 
 echo "Validating Oracle NoSQL installation..."
+[ -s ~/.bashrc ] && source ~/.bashrc > /dev/null 2>&1
+[ -s ~/.bash_profile ] && source ~/.bash_profile > /dev/null 2>&1
+
 kvdir=$targztop
 cd $installdir
 [ -L kvstore ] && rm -f kvstore
@@ -1946,6 +1949,10 @@ fi
 # Create start/stop/admin scripts, execute start script
 SCR=\$KVHOME/scripts/start_kvstore.sh
 echo "#!/bin/bash" > \$SCR
+echo "[ -s ~/.bashrc ] && source ~/.bashrc > /dev/null 2>&1" \
+    >> \$SCR
+echo "[ -s ~/.bash_profile ] && source ~/.bash_profile > /dev/null 2>&1" \
+    >> \$SCR
 echo "export KVHOME=$installdir/kvstore" >> \$SCR
 echo "export KVROOT=$installdir/kvroot" >> \$SCR
 
@@ -2327,6 +2334,8 @@ function run_smoke_test ()
 	echo ""
 	cat > $TMPDIR/nosql_smoke.sh.$$ << EOT
 #!/bin/bash
+[ -s ~/.bash_profile ] && source ~/.bash_profile > /dev/null 2>&1
+[ -s ~/.bashrc ] && source ~/.bashrc > /dev/null 2>&1
 
 # create kvstore_sql.sh on host
 SQL=$installdir/kvstore/scripts/kvstore_sql.sh
@@ -2471,6 +2480,8 @@ if [ $force_overwrite -eq 1 -a -s $installdir/proxy/scripts/stop_proxy.sh ] ; th
 fi
 
 echo "Setting up httpproxy on $host..."
+[ -s ~/.bash_profile ] && source ~/.bash_profile
+[ -s ~/.bashrc ] && source ~/.bashrc
 homedir=\`pwd\`
 cd $installdir
 [ \$? -ne 0 ] && exit 1
@@ -2630,6 +2641,10 @@ fi
 # create proxy start/stop scripts
 SCR=\$PROXYHOME/scripts/start_proxy.sh
 echo "#!/bin/bash" > \$SCR
+echo "[ -s ~/.bashrc ] && source ~/.bashrc > /dev/null 2>&1" \
+    >> \$SCR
+echo "[ -s ~/.bash_profile ] && source ~/.bash_profile > /dev/null 2>&1" \
+    >> \$SCR
 echo "export PROXYHOME=$installdir/proxy" >> \$SCR
 echo "cd \$PROXYHOME/log" >> \$SCR
 dosudo=""
@@ -2639,6 +2654,10 @@ chmod 755 \$SCR
 
 SCR=\$PROXYHOME/scripts/stop_proxy.sh
 echo "#!/bin/bash" > \$SCR
+echo "[ -s ~/.bashrc ] && source ~/.bashrc > /dev/null 2>&1" \
+    >> \$SCR
+echo "[ -s ~/.bash_profile ] && source ~/.bash_profile > /dev/null 2>&1" \
+    >> \$SCR
 echo "export PROXYHOME=$installdir/proxy" >> \$SCR
 echo "\$dosudo pkill -f 'java.*httpproxy.jar'" >> \$SCR
 chmod 755 \$SCR
@@ -2674,7 +2693,7 @@ EOT
 		echo "httpproxy setup failed."
 		if [ $secure_store -eq 1 ] ; then
 			echo ""
-			echo "See https://docs.oracle.com/en/database/other-databases/nosql-database/25.1/admin/secure-proxy.html for information on how to configure a secure proxy."
+			echo "See https://docs.oracle.com/en/database/other-databases/nosql-database/26.1/admin/secure-proxy.html for information on how to configure a secure proxy."
 		fi
 		echo ""
 		exit 1
@@ -2943,7 +2962,7 @@ CLIENTEOT
 	echo ""
 	host=${hosts[0]}
 	echo "Copying test files to $host..."
-	scp $sshopts $TMPDIR/TC.tar.gz ${sshat}$host:/tmp/TC.tar.gz
+	scp $sshopts $TMPDIR/TC.tar.gz ${sshat}$host:/tmp/TC.staging.tar.gz
 	if [ $? -ne 0 ] ; then
 		/bin/rm -f $TMPDIR/TC.tar.gz
 		echo "Error copying test files: skipping extended test."
@@ -2952,7 +2971,7 @@ CLIENTEOT
 	fi
 	/bin/rm -f $TMPDIR/TC.tar.gz
 
-	ssh $sshopts ${sshat}$host "cd $installdir/kvstore && mkdir -p examples/TestClient && cd examples/TestClient && gzip -dc /tmp/TC.tar.gz | tar xvf - && /bin/rm -f /tmp/TC.tar.gz"
+	ssh $sshopts ${sshat}$host "cd $installdir/kvstore && mkdir -p examples/TestClient && cd examples/TestClient && gzip -dc /tmp/TC.staging.tar.gz | tar xvf - && /bin/rm -f /tmp/TC.staging.tar.gz"
 	if [ $? -ne 0 ] ; then
 		echo "Error copying test files: skipping extended test."
 		[ $dotest -eq 1 ] && exit 1
